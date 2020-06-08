@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <Target Name="_RegenerateLibsImageAssets"
+            BeforeTargets="BeforeBuild"
+            Condition="'$(TargetFrameworkIdentifier)' == 'Xamarin.iOS'">
+
+        <!-- Removing one of two 'Assets.car' -->
+        <!-- Pattern matches 'Assets.car' but not 'actool/bundle/Assets.car' -->
+        <PropertyGroup>
+            <AssetsRegEx>^\b(.*Assets\.car)\b(?%3C!actool\/bundle\/Assets\.car).*$</AssetsRegEx>
+            <AssetsRootDir>.generated</AssetsRootDir>
+        </PropertyGroup>
+
+        <!-- Remove library imported Assets.car -->
+        <ItemGroup>
+            <_AssetsToRemove Include="%(_BundleResourceWithLogicalName.Identity)"
+                             Condition="$([System.Text.RegularExpressions.Regex]::IsMatch(%(Identity), $(AssetsRegEx)))"/>
+
+            <_BundleResourceWithLogicalName Remove="@(_AssetsToRemove)"/>
+        </ItemGroup>
+
+        <Delete Files="@(_AssetsToRemove)"/>
+
+        <!-- Remove previously cached Assets -->
+        <RemoveDir Directories="$(AssetsRootDir)" />
+        <MakeDir Directories="$(AssetsRootDir)"/>
+
+        <!-- Clone assets from Libraries -->
+        <ItemGroup>
+            <_AssetsToCopy Include="%(ProjectReference.RelativeDir)**\*.xcassets\**\*.*"
+                           Exclude="%(ProjectReference.RelativeDir)obj\**\*.*"/>
+        </ItemGroup>
+
+        <Copy SourceFiles="@(_AssetsToCopy)"
+              DestinationFiles="@(_AssetsToCopy->'$(AssetsRootDir)\%(RecursiveDir)%(Filename)%(Extension)')" />
+
+        <ItemGroup>
+            <ImageAsset Include="$(AssetsRootDir)\**\*.*"/>
+        </ItemGroup>
+
+        <!-- Call ACTool without output once more just to replace Assets.car -->
+        <ACTool
+                SessionId="$(BuildSessionId)"
+                Condition="'$(IsMacEnabled)' == 'true' And '@(ImageAsset)' != ''"
+                ToolExe="$(ACToolExe)"
+                ToolPath="$(ACToolPath)"
+                AppManifest="$(_AppManifest)"
+                DeviceModel="$(TargetDeviceModel)"
+                DeviceOSVersion="$(TargetDeviceOSVersion)"
+                EnableOnDemandResources="$(EnableOnDemandResources)"
+                ImageAssets="@(ImageAsset)"
+                OptimizePNGs="$(OptimizePNGs)"
+                OutputPath="$(DeviceSpecificOutputPath)"
+                IntermediateOutputPath="$(DeviceSpecificIntermediateOutputPath)"
+                IsWatchApp="$(IsWatchApp)"
+                ProjectDir="$(MSBuildProjectDirectory)"
+                ResourcePrefix="$(IPhoneResourcePrefix)"
+                SdkDevPath="$(_SdkDevPath)"
+                SdkBinPath="$(_SdkBinPath)"
+                SdkUsrPath="$(_SdkUsrPath)"
+                SdkPlatform="$(_SdkPlatform)"
+                SdkVersion="$(MtouchSdkVersion)" />
+    </Target>
+</Project>
